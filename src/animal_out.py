@@ -213,6 +213,15 @@ def get_new_file(filename):
     csv_file.drop("Breed", axis=1, inplace = True)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    
+    if verbose > 0:
+        print_progress("Getting first color...")
+        start_time = time.clock()
+    csv_file["singleColor"] = csv_file["Color"].apply(lambda x: x.split("/")[0])
+    csv_file.drop("Color", axis=1, inplace = True)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
     
     return csv_file    
    
