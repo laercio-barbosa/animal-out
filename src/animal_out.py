@@ -43,8 +43,10 @@ verbose = 0
 nanfill = False
 nominal2numeric = False
 norm_data = False
-remove_att = False
 remove_corr = False
+run_alg = False
+tunning_par = False
+choose_alg = False
 
 # Target attribute
 target_att = ["target"]
@@ -195,7 +197,22 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
-#     csv_file.to_csv("./data/new_" + filename)
+    if verbose > 0:
+        print_progress("Detecting if is a Mix breed...")
+        start_time = time.clock()
+    csv_file["isMix"] = csv_file["Breed"].apply(lambda x: "Mix" in x)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+
+    if verbose > 0:
+        print_progress("Getting first breed and removing Mix...")
+        start_time = time.clock()
+    csv_file["singleBreed"] = csv_file["Breed"].apply(lambda x: x.split("/")[0])
+    csv_file["singleBreed"] = csv_file["singleBreed"].apply(lambda x: x.split(" Mix")[0])
+    csv_file.drop("Breed", axis=1, inplace = True)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
     
     return csv_file    
    
@@ -204,176 +221,188 @@ def get_new_file(filename):
 #                           PRE_PROCESS FUNCTION
 ###############################################################################
 def pre_process(filename):
-    global verbose, nanfill, nominal2numeric, norm_data, remove_att, remove_corr
-
+    global verbose, nanfill, nominal2numeric, norm_data, remove_corr
+ 
     if verbose > 0:
         print_progress("Opening file to pre-process: %s" % os.path.abspath(filename))
         start_time = time.clock()
     csv_file = datafile.read_csv(filename)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
-
-
-    if (nominal2numeric == True):
-        if verbose > 0:
-            print_progress("Converting nominal to numeric data...")
-            start_time = time.clock()
-        to_number = LabelEncoder()
-        csv_file["v3"  ] = to_number.fit_transform(csv_file.v3)
-        csv_file["v22" ] = to_number.fit_transform(csv_file.v22)
-        csv_file["v24" ] = to_number.fit_transform(csv_file.v24)
-        csv_file["v30" ] = to_number.fit_transform(csv_file.v30)
-        csv_file["v31" ] = to_number.fit_transform(csv_file.v31)
-        csv_file["v47" ] = to_number.fit_transform(csv_file.v47)
-        csv_file["v52" ] = to_number.fit_transform(csv_file.v52)
-        csv_file["v56" ] = to_number.fit_transform(csv_file.v56)
-        csv_file["v66" ] = to_number.fit_transform(csv_file.v66)
-        csv_file["v71" ] = to_number.fit_transform(csv_file.v71)
-        csv_file["v74" ] = to_number.fit_transform(csv_file.v74)
-        csv_file["v75" ] = to_number.fit_transform(csv_file.v75)
-        csv_file["v79" ] = to_number.fit_transform(csv_file.v79)
-        csv_file["v91" ] = to_number.fit_transform(csv_file.v91)
-        csv_file["v107"] = to_number.fit_transform(csv_file.v107)
-        csv_file["v110"] = to_number.fit_transform(csv_file.v110)
-        csv_file["v112"] = to_number.fit_transform(csv_file.v112)
-        csv_file["v113"] = to_number.fit_transform(csv_file.v113)
-        csv_file["v125"] = to_number.fit_transform(csv_file.v125)
-        if verbose > 0:
-            print("--> %8.3f seconds" % (time.clock() - start_time))
-
-    if (remove_att == True):        
-        if verbose > 0:
-            print_progress("Removing attributes...")
-            start_time = time.clock()
-        csv_file.drop(nodist_att_droplist + constdist_att_droplist +
-                      double_att_droplist + others_att_droplist, \
-                      axis=1, inplace = True)
-        if verbose > 0:
-            print("--> %8.3f seconds" % (time.clock() - start_time))
-
-
-    if (nominal2numeric == False):        
-        if verbose > 0:
-            print_progress("Removing nominal attributes...")
-            start_time = time.clock()
-        csv_file.drop(nominal_att_droplist, axis=1, inplace = True)
-        if verbose > 0:
-            print("--> %8.3f seconds" % (time.clock() - start_time))
-        
-    if (remove_corr == True):
-        if verbose > 0:
-            print_progress("Removing attributes with correlation >= 95% ...")
-            start_time = time.clock()
-        csv_file.drop(correlation95_att_droplist, axis=1, inplace = True)
-        if verbose > 0:
-            print("--> %8.3f seconds" % (time.clock() - start_time))
-   
-    # Only remove lines for training. Test data must be treated with all data. 
-    if verbose > 0:
-        start_time = time.clock()
-    if (nanfill == True):
-        if verbose > 0:
-            print_progress("Filliing NAN with -1...")
-        processed_file = csv_file.fillna(-1)
-    else:
-        if verbose > 0:
-            print_progress("Removing NAN from data...")
+ 
+ 
+#     if (nominal2numeric == True):
+#         if verbose > 0:
+#             print_progress("Converting nominal to numeric data...")
+#             start_time = time.clock()
+#         to_number = LabelEncoder()
+#         csv_file["v3"  ] = to_number.fit_transform(csv_file.v3)
+#         csv_file["v22" ] = to_number.fit_transform(csv_file.v22)
+#         csv_file["v24" ] = to_number.fit_transform(csv_file.v24)
+#         csv_file["v30" ] = to_number.fit_transform(csv_file.v30)
+#         csv_file["v31" ] = to_number.fit_transform(csv_file.v31)
+#         csv_file["v47" ] = to_number.fit_transform(csv_file.v47)
+#         csv_file["v52" ] = to_number.fit_transform(csv_file.v52)
+#         csv_file["v56" ] = to_number.fit_transform(csv_file.v56)
+#         csv_file["v66" ] = to_number.fit_transform(csv_file.v66)
+#         csv_file["v71" ] = to_number.fit_transform(csv_file.v71)
+#         csv_file["v74" ] = to_number.fit_transform(csv_file.v74)
+#         csv_file["v75" ] = to_number.fit_transform(csv_file.v75)
+#         csv_file["v79" ] = to_number.fit_transform(csv_file.v79)
+#         csv_file["v91" ] = to_number.fit_transform(csv_file.v91)
+#         csv_file["v107"] = to_number.fit_transform(csv_file.v107)
+#         csv_file["v110"] = to_number.fit_transform(csv_file.v110)
+#         csv_file["v112"] = to_number.fit_transform(csv_file.v112)
+#         csv_file["v113"] = to_number.fit_transform(csv_file.v113)
+#         csv_file["v125"] = to_number.fit_transform(csv_file.v125)
+#         if verbose > 0:
+#             print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+# 
+#     if (nominal2numeric == False):        
+#         if verbose > 0:
+#             print_progress("Removing nominal attributes...")
+#             start_time = time.clock()
+#         csv_file.drop(nominal_att_droplist, axis=1, inplace = True)
+#         if verbose > 0:
+#             print("--> %8.3f seconds" % (time.clock() - start_time))
+#         
+#     if (remove_corr == True):
+#         if verbose > 0:
+#             print_progress("Removing attributes with correlation >= 95% ...")
+#             start_time = time.clock()
+#         csv_file.drop(correlation95_att_droplist, axis=1, inplace = True)
+#         if verbose > 0:
+#             print("--> %8.3f seconds" % (time.clock() - start_time))
+#    
+#     # Only remove lines for training. Test data must be treated with all data. 
+#     if verbose > 0:
+#         start_time = time.clock()
+#     if (nanfill == True):
+#         if verbose > 0:
+#             print_progress("Filliing NAN with -1...")
+#         processed_file = csv_file.fillna(-1)
+#     else:
+#         if verbose > 0:
+#             print_progress("Removing NAN from data...")
+#         processed_file = csv_file.dropna()
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+#     # processed_file still keep 'ID' and, maybe, 'target' attributes.
+#     # Let's remove them!
+#     id_data = processed_file["ID"].values
+#     if "target" in csv_file.columns:
+#         target_data    = processed_file["target"].values
+#         processed_file = processed_file.drop(target_att + id_att, axis=1)
+#         if (norm_data == True):
+#             if verbose > 0:
+#                 print_progress("Normalizing data...")
+#                 start_time = time.clock()
+#             processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
+#             if verbose > 0:
+#                 print("--> %8.3f seconds" % (time.clock() - start_time))
+#         return processed_file, id_data, target_data
+#     else:
+#         processed_file = processed_file.drop(id_att, axis=1)
+#         if (norm_data == True):
+#             if verbose > 0:
+#                 print_progress("Normalizing data...")
+#                 start_time = time.clock()
+#             processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
+#             if verbose > 0:
+#                 print("--> %8.3f seconds" % (time.clock() - start_time))
+        # TODO Remover as atribuicoes abaixo
         processed_file = csv_file.dropna()
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-
-    # processed_file still keep 'ID' and, maybe, 'target' attributes.
-    # Let's remove them!
-    id_data = processed_file["ID"].values
-    if "target" in csv_file.columns:
-        target_data    = processed_file["target"].values
-        processed_file = processed_file.drop(target_att + id_att, axis=1)
-        if (norm_data == True):
-            if verbose > 0:
-                print_progress("Normalizing data...")
-                start_time = time.clock()
-            processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
-            if verbose > 0:
-                print("--> %8.3f seconds" % (time.clock() - start_time))
-        return processed_file, id_data, target_data
-    else:
-        processed_file = processed_file.drop(id_att, axis=1)
-        if (norm_data == True):
-            if verbose > 0:
-                print_progress("Normalizing data...")
-                start_time = time.clock()
-            processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
-            if verbose > 0:
-                print("--> %8.3f seconds" % (time.clock() - start_time))
+        id_data = processed_file["ID"].values
         return processed_file, id_data
         
         
 ###############################################################################
 #                           RUN_ALGORITHM FUNCTION
 ###############################################################################
-def run_algorithm(train_file, test_file, target_data, train_sample_size):
-    global verbose
-    perc = 0.1 # Percentage to build a training/test files
-    
-    if verbose > 0:
-        print_progress("Create the random forest object for fitting.")
-        start_time = time.clock()
-    # random_state=1000 is a magic number. See answer by cacol89 in this question: 
-    # http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html    
-    classif = RandomForestClassifier(n_estimators = 200, n_jobs = -1, \
-                                     max_features=None, random_state=1000, \
-                                     class_weight={1:0.7612, 0:0.2388})
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
+def tunning_parameters():
+    parameter = 0
 
 
-    if verbose > 0:
-        print_progress("Creating training data for fitting...")
-        start_time = time.clock()
-    # We need a subset of a known data in order to fit the classifier
-    # and calculate its score.
-    train_fit_file  = train_file[:train_sample_size]
-    fit_target_data = target_data[:train_sample_size]
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
+###############################################################################
+#                       CHOOSE THE BEST ALGORITHM FUNCTION
+###############################################################################
+def choose_best_algorithm():
+    alg_chosen = ''
 
-    if verbose > 0:
-        print_progress("Performing fitting...")
-        start_time = time.clock()
-    fit_result = classif.fit(train_fit_file, fit_target_data)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-    
-    
-    if verbose > 0:
-        print_progress("Performing prediction on training data...")
-        start_time = time.clock()
-    # As we took a percentage of data to fit the classifier, now we use 
-    # 100% - perc for training data
-    train_file  = train_file [int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
-    target_data = target_data[int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
-    prediction  = fit_result.predict(train_file)    
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
+    return alg_chosen
 
-
-    if verbose > 0:
-        print_progress("Calculating training score...")
-        start_time = time.clock()
-    training_score = precision_score(target_data, prediction)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-    
-
-    if verbose > 0:
-        print_progress("Performing prediction on test data...")
-        start_time = time.clock()
-    prediction  = fit_result.predict(test_file)    
-    pred_prob   = fit_result.predict_proba(test_file)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-
-    
+###############################################################################
+#                           RUN_ALGORITHM FUNCTION
+###############################################################################
+def run_algorithm(best_alg, train_file, test_file, target_data, train_sample_size):
+#     global verbose
+#     perc = 0.1 # Percentage to build a training/test files
+#     
+#     if verbose > 0:
+#         print_progress("Create the random forest object for fitting.")
+#         start_time = time.clock()
+#     # random_state=1000 is a magic number. See answer by cacol89 in this question: 
+#     # http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html    
+#     classif = RandomForestClassifier(n_estimators = 200, n_jobs = -1, \
+#                                      max_features=None, random_state=1000, \
+#                                      class_weight={1:0.7612, 0:0.2388})
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+# 
+#     if verbose > 0:
+#         print_progress("Creating training data for fitting...")
+#         start_time = time.clock()
+#     # We need a subset of a known data in order to fit the classifier
+#     # and calculate its score.
+#     train_fit_file  = train_file[:train_sample_size]
+#     fit_target_data = target_data[:train_sample_size]
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+#     if verbose > 0:
+#         print_progress("Performing fitting...")
+#         start_time = time.clock()
+#     fit_result = classif.fit(train_fit_file, fit_target_data)
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+#     
+#     
+#     if verbose > 0:
+#         print_progress("Performing prediction on training data...")
+#         start_time = time.clock()
+#     # As we took a percentage of data to fit the classifier, now we use 
+#     # 100% - perc for training data
+#     train_file  = train_file [int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
+#     target_data = target_data[int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
+#     prediction  = fit_result.predict(train_file)    
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+# 
+#     if verbose > 0:
+#         print_progress("Calculating training score...")
+#         start_time = time.clock()
+#     training_score = precision_score(target_data, prediction)
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+#     
+# 
+#     if verbose > 0:
+#         print_progress("Performing prediction on test data...")
+#         start_time = time.clock()
+#     prediction  = fit_result.predict(test_file)    
+#     pred_prob   = fit_result.predict_proba(test_file)
+#     if verbose > 0:
+#         print("--> %8.3f seconds" % (time.clock() - start_time))
+# 
+# 
+    # TODO Remover as atribuicoes abaixo
+    training_score = 0.0
+    pred_prob = 0.0
+    prediction = 0.0
     return training_score, pred_prob, prediction
 
 
@@ -415,7 +444,8 @@ def show_results(pred_prob, prediction, training_score, id_test, out_filename, t
 #                               MAIN FUNCTION
 ###############################################################################
 def main(argv=None): # IGNORE:C0111
-    global verbose, nanfill, nominal2numeric, norm_data, remove_att, remove_corr
+    global verbose, nanfill, nominal2numeric, norm_data, remove_corr, run_alg, \
+           choose_alg, tunning_par
 
     total_time = time.clock()
 
@@ -450,7 +480,6 @@ USAGE
         parser.add_argument("-c", dest="remove_cor", default=False, action="store_true", help="remove attributes with correlation >= 95% between each other")
         parser.add_argument("-m", dest="norm_data" , default=False, action="store_true", help="norm numeric data")
         parser.add_argument("-n", dest="nanfill"   , default=False, action="store_true", help="fills nan values with -1")
-        parser.add_argument("-r", dest="remove_at" , default=False, action="store_true", help="remove some pre-defined attributes")
         parser.add_argument("-s", dest="size_tr"   , default=1000 ,                      help="sample size for training")
         parser.add_argument("-v", dest="verbose"   , default=0    , action="count",      help="shows script execution steps")
         parser.add_argument("-x", dest="nom2num"   , default=False, action="store_true", help="convert nominal attributes to numerical")
@@ -464,7 +493,6 @@ USAGE
         nanfill        = args.nanfill 
         nominal2numeric= args.nom2num
         norm_data      = args.norm_data
-        remove_att     = args.remove_at
         remove_corr    = args.remove_cor
         sample_size_tr = int(args.size_tr)
 
@@ -479,14 +507,20 @@ USAGE
         
         # Let's play and have some fun!
         new_train_file = get_new_file(train_filename)
-#         train_file, _, target_data = pre_process(train_filename)
-#         test_file, test_id_data    = pre_process(test_filename)
-#         train_score, pred_prob, prediction = run_algorithm(train_file, \
-#                                                            test_file, \
-#                                                            target_data, \
-#                                                            sample_size_tr)
-#         show_results(pred_prob, prediction, train_score, test_id_data, \
-#                      out_filename, total_time)        
+        new_test_file  = get_new_file(test_filename)
+        
+        train_file, _, target_data = pre_process(new_train_file)
+        test_file, test_id_data    = pre_process(new_test_file)
+        
+        tunning_parameters()
+        best_alg = choose_best_algorithm()
+        train_score, pred_prob, prediction = run_algorithm(best_alg, \
+                                                           train_file, \
+                                                           test_file, \
+                                                           target_data, \
+                                                           sample_size_tr)
+        show_results(pred_prob, prediction, train_score, test_id_data, \
+                     out_filename, total_time)        
         
         
         return 0
