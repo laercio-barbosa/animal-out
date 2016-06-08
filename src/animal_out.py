@@ -38,6 +38,7 @@ remove_corr = False
 run_alg = False
 tunning_par = False
 choose_alg = False
+new_train_file = ""
 
 # TODO: Remover a lista de atributos abaixo apos implementar a 
 # rotina de pre-processamento
@@ -456,6 +457,39 @@ def print_results(pred_prob, training_score, id_test, out_filename, totaltime):
         print("Done!")
 
 
+#######################################################################
+#       ALTERNATIVE PRE PROCESS 
+#######################################################################
+def pre_process_shelter(csv_file):
+    to_number = LabelEncoder()
+    csv_file["AnimalType"] = to_number.fit_transform(csv_file['AnimalType'])
+    csv_file["OutcomeType"] = to_number.fit_transform(csv_file['OutcomeType'])
+    csv_file["Sex"] = to_number.fit_transform(csv_file['Sex'])
+    csv_file["Neutered"] = to_number.fit_transform(csv_file['Neutered'])
+    csv_file["isMix"] = to_number.fit_transform(csv_file['isMix'])
+    csv_file["hasName"] = to_number.fit_transform(csv_file['hasName'])
+
+    return csv_file
+    
+#######################################################################
+#       ALTERNATIVE MAIN
+#######################################################################
+def alternative_main(argv=None):
+    global new_train_file
+    
+    actual_directory = os.path.dirname(os.path.abspath(__file__))
+    
+    os.chdir("..")
+    actual_directory = os.path.abspath(os.curdir)
+    
+    train_file = actual_directory+'\\data\\train.csv';
+
+    #records = datafile.read_csv(train_file)
+    
+    #print (records['OutcomeType'])
+    
+    new_train_file = get_new_file(train_file)
+    new_train_file = pre_process_shelter(new_train_file)
     
 ###############################################################################
 #                               MAIN FUNCTION
@@ -527,11 +561,12 @@ def main(argv=None): # IGNORE:C0111
     
     
     # Handle errors
-    except Exception, e:
+    except Exception as e:
         raise(e)
         return 2
 
 
 # Application start up
 if __name__ == "__main__":
-    sys.exit(main())
+    #sys.exit(main())
+    sys.exit(alternative_main())
