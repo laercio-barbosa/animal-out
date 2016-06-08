@@ -1,16 +1,11 @@
 #!/usr/local/bin/python2.7
 # encoding: utf-8
 '''
-src.RandomForest -- Machine Learning Algorithm
-
-src.RandomForest is a script to run Random Forest algorithm at a data set
+src.animal_out -- Machine Learning Algorithm
 
 @author:     Laercio, Pedro and Lucca
-
 @copyright:  2016 ICMC. All rights reserved.
-
 @license:    license
-
 @contact:    leoabubauru@hotmail.com
 @deffield    updated: Updated
 '''
@@ -29,16 +24,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_score
 from sklearn.preprocessing import LabelEncoder, normalize
 
-__all__ = []
-__version__ = 0.1
-__date__ = '2016-06-01'
-__updated__ = '2016-06-01'
-
 
 ###############################################################################
 #                           SOME PARAMETERS
 ###############################################################################
-DEBUG = 1
 verbose = 0
 nanfill = False
 nominal2numeric = False
@@ -77,20 +66,6 @@ correlation95_att_droplist = ["v46", "v53", "v54", "v60", "v63", "v76", "v83", \
 others_att_droplist = []
 
 
-###############################################################################
-#                           EXCEPTION CLASS
-###############################################################################
-class CLIError(Exception):
-    '''Generic exception to raise and log different fatal errors.'''
-    def __init__(self, msg):
-        super(CLIError).__init__(type(self))
-        self.msg = "E: %s" % msg
-    def __str__(self):
-        return self.msg
-    def __unicode__(self):
-        return self.msg
-        
-        
 ###############################################################################
 #                       AGE CONVERSION FUNCTION
 ###############################################################################
@@ -458,34 +433,9 @@ def main(argv=None): # IGNORE:C0111
 
     total_time = time.clock()
 
-    '''Command line options.'''
-    if argv is None:
-        argv = sys.argv
-    else:
-        sys.argv.extend(argv)
-
-    program_name = os.path.basename(sys.argv[0])
-    program_version = "v%s" % __version__
-    program_build_date = str(__updated__)
-    program_version_message = '%%(prog)s %s (%s)' % (program_version, program_build_date)
-    program_shortdesc = __import__('__main__').__doc__.split("\n")[1]
-    program_license = '''%s
-
-  Created by Laercio Barbosa on %s.
-  Copyright 2016 ICMC. All rights reserved.
-
-  Licensed under the Apache License 2.0
-  http://www.apache.org/licenses/LICENSE-2.0
-
-  Distributed on an "AS IS" basis without warranties
-  or conditions of any kind, either express or implied.
-
-USAGE
-''' % (program_shortdesc, str(__date__))
-
     try:
         # Setup argument parser
-        parser = ArgumentParser(description=program_license, formatter_class=RawDescriptionHelpFormatter)
+        parser = ArgumentParser()
         parser.add_argument("-c", dest="remove_cor", default=False, action="store_true", help="remove attributes with correlation >= 95% between each other")
         parser.add_argument("-m", dest="norm_data" , default=False, action="store_true", help="norm numeric data")
         parser.add_argument("-n", dest="nanfill"   , default=False, action="store_true", help="fills nan values with -1")
@@ -511,7 +461,7 @@ USAGE
         if (train_filename and test_filename and out_filename) and \
            (train_filename == test_filename) or (train_filename == out_filename) or \
            (test_filename == out_filename):
-            raise CLIError("Input and output filenames must be unique!")
+            print("ERROR: Input and output filenames must be unique!")
         
         
         # Let's play and have some fun!
@@ -534,11 +484,7 @@ USAGE
         
         return 0
     except Exception, e:
-        if DEBUG:
-            raise(e)
-        indent = len(program_name) * " "
-        sys.stderr.write(program_name + ": " + repr(e) + "\n")
-        sys.stderr.write(indent + "  for help, use --help")
+        raise(e)
         return 2
 
 
