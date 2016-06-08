@@ -214,11 +214,20 @@ def get_new_file(filename):
         print_progress("Getting first color...")
         start_time = time.clock()
     csv_file["singleColor"] = csv_file["Color"].apply(lambda x: x.split("/")[0])
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+        
+    # Count colors in each animal
+    if verbose > 0:
+        print_progress("Counting color for each animal ...")
+        start_time = time.clock()
+    csv_file["nbrofColors"] = csv_file["Color"].apply(lambda x: len((x.split("/"))))
     csv_file.drop("Color", axis=1, inplace = True)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
         
-                
+                            
     # Create a atribute with info if the animal has a name
     if verbose > 0:
         print_progress("Has the animal a name?")
