@@ -28,6 +28,8 @@ from sklearn.preprocessing import LabelEncoder, normalize
 ###############################################################################
 #                           SOME PARAMETERS
 ###############################################################################
+
+# Global variables
 verbose = 0
 nanfill = False
 nominal2numeric = False
@@ -36,6 +38,9 @@ remove_corr = False
 run_alg = False
 tunning_par = False
 choose_alg = False
+
+# TODO: Remover a lista de atributos abaixo apos implementar a 
+# rotina de pre-processamento
 
 # Target attribute
 target_att = ["target"]
@@ -129,11 +134,14 @@ def get_time_info(date_time):
        
         
 ###############################################################################
-#                       BUILD A NEW TRAIN FILE FUNCTION
+#                    BUILD A NEW TRAIN/TEST FILE FUNCTION
+# Each task print some info and calculates spent time by itself.
+# Then split some data as the original datafile has mixed info in it.
 ###############################################################################
 def get_new_file(filename):
     global verbose
-
+    
+    # First of all we need open/read the datafile
     if verbose > 0:
         print_progress("Opening %s file to rebuild it." % os.path.abspath(filename))
         start_time = time.clock()
@@ -142,6 +150,7 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
+    # Then we convert 'AgeuponOutcome' to unit 'days'
     if verbose > 0:
         print_progress("Converting age to days...")
         start_time = time.clock()
@@ -152,6 +161,7 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
     
+    # Split sex and neutered info in two new columns
     if verbose > 0:
         print_progress("Splitting sex and neutered info...")
         start_time = time.clock()
@@ -162,6 +172,7 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
+    # Date/time is also splited in two new columns
     if verbose > 0:
         print_progress("Splitting date and time info...")
         start_time = time.clock()
@@ -172,6 +183,7 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
+    # Generates a new column with boolean info 'isMix' for breed
     if verbose > 0:
         print_progress("Detecting if is a Mix breed...")
         start_time = time.clock()
@@ -180,6 +192,8 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
+    # Breed must be handled as it has many different types. So we
+    # take only the first breed before '/' and remove 'Mix'
     if verbose > 0:
         print_progress("Getting first breed and removing Mix...")
         start_time = time.clock()
@@ -190,6 +204,7 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
     
+    # Also for colors we split them and take only the first one
     if verbose > 0:
         print_progress("Getting first color...")
         start_time = time.clock()
@@ -198,6 +213,7 @@ def get_new_file(filename):
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
     
+    # Now we have a new datafile
     return csv_file    
    
    
@@ -406,14 +422,14 @@ def print_progress(msg):
 ###############################################################################
 #                           SHOW_RESULTS FUNCTION
 ###############################################################################
-def show_results(pred_prob, prediction, training_score, id_test, out_filename, totaltime):
+def print_results(pred_prob, prediction, training_score, id_test, out_filename, totaltime):
     global verbose
 
-    print ("Precision training score: %.2f" % (training_score * 100.0))    
+    print ("Training accuracy: %.2f" % (training_score * 100.0))    
 
     if verbose > 0:
         start_time = time.clock()
-        print_progress("Wrinting output file...")
+        print_progress("Writing output file...")
     datafile.DataFrame({"ID": id_test, "PredictedProb": pred_prob[:,1]}).\
                         to_csv(out_filename, index=False)
     if verbose > 0:
@@ -434,7 +450,7 @@ def main(argv=None): # IGNORE:C0111
     total_time = time.clock()
 
     try:
-        # Setup argument parser
+        # Parser for command line arguments
         parser = ArgumentParser()
         parser.add_argument("-c", dest="remove_cor", default=False, action="store_true", help="remove attributes with correlation >= 95% between each other")
         parser.add_argument("-m", dest="norm_data" , default=False, action="store_true", help="norm numeric data")
@@ -464,29 +480,41 @@ def main(argv=None): # IGNORE:C0111
             print("ERROR: Input and output filenames must be unique!")
         
         
-        # Let's play and have some fun!
+        # Handle input files as they have mixed info in the attributes
         new_train_file = get_new_file(train_filename)
         new_test_file  = get_new_file(test_filename)
         
+        # Pre-process the data
         train_file, _, target_data = pre_process(new_train_file)
         test_file, test_id_data    = pre_process(new_test_file)
         
+        # Run cross-validation to tune parameters for the algorithms
         tunning_parameters()
+        
+        # Run cross-validation to choose the best algorithm for this problem
         best_alg = choose_best_algorithm()
+        
+        # Run the algorithm chosen
         train_score, pred_prob, prediction = run_algorithm(best_alg, \
                                                            train_file, \
                                                            test_file, \
                                                            target_data, \
                                                            sample_size_tr)
-        show_results(pred_prob, prediction, train_score, test_id_data, \
+        
+        # Print the results and save a file with the probabilities
+        print_results(pred_prob, prediction, train_score, test_id_data, \
                      out_filename, total_time)        
         
-        
+        # Ends application
         return 0
+    
+    
+    # Handle errors
     except Exception, e:
         raise(e)
         return 2
 
 
+# Application start up
 if __name__ == "__main__":
     sys.exit(main())
