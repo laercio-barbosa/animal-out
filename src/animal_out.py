@@ -148,6 +148,11 @@ def get_new_file(filename):
     csv_file = datafile.read_csv(filename)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+    # One of the files has a different column ID name. Fix it so that
+    # both train and test have the same column name for ID    
+    if "AnimalID" in csv_file.columns:
+        csv_file=csv_file.rename(columns = {"AnimalID":"ID"})
 
 
     # Then we convert 'AgeuponOutcome' to unit 'days'
@@ -212,7 +217,18 @@ def get_new_file(filename):
     csv_file.drop("Color", axis=1, inplace = True)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
-    
+        
+                
+    # Create a atribute with info if the animal has a name
+    if verbose > 0:
+        print_progress("Has the animal a name?")
+        start_time = time.clock()
+    csv_file["hasName"] = csv_file["Name"].apply(lambda x: type(x) is str)
+    csv_file.drop("Name", axis=1, inplace = True)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+        
     # Now we have a new datafile
     return csv_file    
    
@@ -222,13 +238,6 @@ def get_new_file(filename):
 ###############################################################################
 def pre_process(filename):
     global verbose, nanfill, nominal2numeric, norm_data, remove_corr
- 
-    if verbose > 0:
-        print_progress("Opening file to pre-process: %s" % os.path.abspath(filename))
-        start_time = time.clock()
-    csv_file = datafile.read_csv(filename)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
  
  
 #     if (nominal2numeric == True):
@@ -313,9 +322,9 @@ def pre_process(filename):
 #             if verbose > 0:
 #                 print("--> %8.3f seconds" % (time.clock() - start_time))
         # TODO Remover as atribuicoes abaixo
-        processed_file = csv_file.dropna()
-        id_data = processed_file["ID"].values
-        return processed_file, id_data
+    processed_file = filename.dropna()
+    id_data = processed_file["ID"].values
+    return processed_file, id_data
         
         
 ###############################################################################
@@ -402,8 +411,7 @@ def run_algorithm(best_alg, train_file, test_file, target_data, train_sample_siz
     # TODO Remover as atribuicoes abaixo
     training_score = 0.0
     pred_prob = 0.0
-    prediction = 0.0
-    return training_score, pred_prob, prediction
+    return training_score, pred_prob
 
 
 ###############################################################################
@@ -422,7 +430,7 @@ def print_progress(msg):
 ###############################################################################
 #                           SHOW_RESULTS FUNCTION
 ###############################################################################
-def print_results(pred_prob, prediction, training_score, id_test, out_filename, totaltime):
+def print_results(pred_prob, training_score, id_test, out_filename, totaltime):
     global verbose
 
     print ("Training accuracy: %.2f" % (training_score * 100.0))    
@@ -430,8 +438,8 @@ def print_results(pred_prob, prediction, training_score, id_test, out_filename, 
     if verbose > 0:
         start_time = time.clock()
         print_progress("Writing output file...")
-    datafile.DataFrame({"ID": id_test, "PredictedProb": pred_prob[:,1]}).\
-                        to_csv(out_filename, index=False)
+#     datafile.DataFrame({"ID": id_test, "PredictedProb": pred_prob[:,1]}).\
+#                         to_csv(out_filename, index=False)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
         print("Total execution time: %8.3f seconds" % (time.clock() - totaltime))
@@ -485,8 +493,8 @@ def main(argv=None): # IGNORE:C0111
         new_test_file  = get_new_file(test_filename)
         
         # Pre-process the data
-        train_file, _, target_data = pre_process(new_train_file)
-        test_file, test_id_data    = pre_process(new_test_file)
+        train_file, target_data = pre_process(new_train_file)
+        test_file, test_id_data = pre_process(new_test_file)
         
         # Run cross-validation to tune parameters for the algorithms
         tunning_parameters()
@@ -495,15 +503,15 @@ def main(argv=None): # IGNORE:C0111
         best_alg = choose_best_algorithm()
         
         # Run the algorithm chosen
-        train_score, pred_prob, prediction = run_algorithm(best_alg, \
-                                                           train_file, \
-                                                           test_file, \
-                                                           target_data, \
-                                                           sample_size_tr)
+        train_score, pred_prob = run_algorithm(best_alg, \
+                                               train_file, \
+                                               test_file, \
+                                               target_data, \
+                                               sample_size_tr)
         
         # Print the results and save a file with the probabilities
-        print_results(pred_prob, prediction, train_score, test_id_data, \
-                     out_filename, total_time)        
+        print_results(pred_prob, train_score, test_id_data, \
+                      out_filename, total_time)        
         
         # Ends application
         return 0
