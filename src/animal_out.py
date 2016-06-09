@@ -424,7 +424,7 @@ def run_algorithm(best_alg, train_file, test_file, target_data, train_sample_siz
 
 
 ###############################################################################
-#                           SHOW_RESULTS FUNCTION
+#                           PRINT PROGRESS FUNCTION
 ###############################################################################
 def print_progress(msg):
 # line length
@@ -479,9 +479,9 @@ def main(argv=None): # IGNORE:C0111
         # Process arguments
         args           = parser.parse_args()
         verbose        = args.verbose
-        train_filename = "./data/train.csv"
-        test_filename  = "./data/test.csv"
-        out_filename   = "./out/result.csv"
+        train_filename = "../data/train.csv"
+        test_filename  = "../data/test.csv"
+        out_filename   = "../out/result.csv"
         nanfill        = args.nanfill 
         nominal2numeric= args.nom2num
         norm_data      = args.norm_data
@@ -511,7 +511,7 @@ def main(argv=None): # IGNORE:C0111
         # Run cross-validation to choose the best algorithm for this problem
         best_alg = choose_best_algorithm()
         
-        # Run the algorithm chosen
+        # Run the chosen algorithm
         train_score, pred_prob = run_algorithm(best_alg, \
                                                train_file, \
                                                test_file, \
