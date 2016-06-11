@@ -18,11 +18,12 @@ import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("ggplot")
 
-from argparse import ArgumentParser
-from argparse import RawDescriptionHelpFormatter
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import precision_score
-from sklearn.preprocessing import LabelEncoder, normalize
+from argparse                 import ArgumentParser
+from argparse                 import RawDescriptionHelpFormatter
+from sklearn.ensemble         import RandomForestClassifier
+from sklearn.metrics          import precision_score
+from sklearn.preprocessing    import LabelEncoder, normalize
+from sklearn.cross_validation import KFold
 
 
 ###############################################################################
@@ -39,36 +40,21 @@ run_alg = False
 tunning_par = False
 choose_alg = False
 
-# TODO: Remover a lista de atributos abaixo apos implementar a 
-# rotina de pre-processamento
+class rf_param_t:
+    n_estimators = 200
+
+class nb_param_t:
+    n_estimators = 200
 
 # Target attribute
-target_att = ["target"]
+target_att = ["OutcomeType"]
 
 # ID attribute
 id_att = ["ID"]
 
-# Nominal attributes drop out list
-nominal_att_droplist = ["v3", "v22", "v24", "v30", "v31", "v47", "v52", "v56", \
-                        "v66", "v71", "v74", "v75", "v79", "v91", "v107", \
-                        "v110", "v112", "v113", "v125"]
+# Nominal attributes drop out list. Only common attibutes for both train/test files
+useless_att_droplist = ["DateTime"]
 
-# No-distribution attributes drop out list
-nodist_att_droplist = ["v23", "v38"]
-
-# Const-distribution attributes drop out list
-constdist_att_droplist = []
-
-# Duplicated attributes drop out list. Leaving only one of them.
-double_att_droplist = []
-
-# Attributes with correlation > 95% drop out list
-correlation95_att_droplist = ["v46", "v53", "v54", "v60", "v63", "v76", "v83", \
-                              "v89", "v95", "v96", "v100","v105", "v106","v114",\
-                              "v115","v116","v118","v121",]
-
-# Others attributes drop out list
-others_att_droplist = []
 
 
 ###############################################################################
@@ -177,17 +163,6 @@ def get_new_file(filename):
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
-    # Date/time is also splited in two new columns
-    if verbose > 0:
-        print_progress("Splitting date and time info...")
-        start_time = time.clock()
-    csv_file["Date"] = csv_file["DateTime"].apply(get_date_info)
-    csv_file["Time"] = csv_file["DateTime"].apply(get_time_info)
-    csv_file.drop("DateTime", axis=1, inplace = True)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-
-
     # Generates a new column with boolean info 'isMix' for breed
     if verbose > 0:
         print_progress("Detecting if is a Mix breed...")
@@ -245,95 +220,56 @@ def get_new_file(filename):
 ###############################################################################
 #                           PRE_PROCESS FUNCTION
 ###############################################################################
-def pre_process(filename):
+def pre_process(csv_file):
     global verbose, nanfill, nominal2numeric, norm_data, remove_corr
  
  
-#     if (nominal2numeric == True):
-#         if verbose > 0:
-#             print_progress("Converting nominal to numeric data...")
-#             start_time = time.clock()
-#         to_number = LabelEncoder()
-#         csv_file["v3"  ] = to_number.fit_transform(csv_file.v3)
-#         csv_file["v22" ] = to_number.fit_transform(csv_file.v22)
-#         csv_file["v24" ] = to_number.fit_transform(csv_file.v24)
-#         csv_file["v30" ] = to_number.fit_transform(csv_file.v30)
-#         csv_file["v31" ] = to_number.fit_transform(csv_file.v31)
-#         csv_file["v47" ] = to_number.fit_transform(csv_file.v47)
-#         csv_file["v52" ] = to_number.fit_transform(csv_file.v52)
-#         csv_file["v56" ] = to_number.fit_transform(csv_file.v56)
-#         csv_file["v66" ] = to_number.fit_transform(csv_file.v66)
-#         csv_file["v71" ] = to_number.fit_transform(csv_file.v71)
-#         csv_file["v74" ] = to_number.fit_transform(csv_file.v74)
-#         csv_file["v75" ] = to_number.fit_transform(csv_file.v75)
-#         csv_file["v79" ] = to_number.fit_transform(csv_file.v79)
-#         csv_file["v91" ] = to_number.fit_transform(csv_file.v91)
-#         csv_file["v107"] = to_number.fit_transform(csv_file.v107)
-#         csv_file["v110"] = to_number.fit_transform(csv_file.v110)
-#         csv_file["v112"] = to_number.fit_transform(csv_file.v112)
-#         csv_file["v113"] = to_number.fit_transform(csv_file.v113)
-#         csv_file["v125"] = to_number.fit_transform(csv_file.v125)
-#         if verbose > 0:
-#             print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-# 
-#     if (nominal2numeric == False):        
-#         if verbose > 0:
-#             print_progress("Removing nominal attributes...")
-#             start_time = time.clock()
-#         csv_file.drop(nominal_att_droplist, axis=1, inplace = True)
-#         if verbose > 0:
-#             print("--> %8.3f seconds" % (time.clock() - start_time))
-#         
-#     if (remove_corr == True):
-#         if verbose > 0:
-#             print_progress("Removing attributes with correlation >= 95% ...")
-#             start_time = time.clock()
-#         csv_file.drop(correlation95_att_droplist, axis=1, inplace = True)
-#         if verbose > 0:
-#             print("--> %8.3f seconds" % (time.clock() - start_time))
-#    
-#     # Only remove lines for training. Test data must be treated with all data. 
+    if verbose > 0:
+        print_progress("Removing useless attributes...")
+        start_time = time.clock()
+    csv_file.drop(useless_att_droplist, axis=1, inplace = True)
+    if "OutcomeSubType" in csv_file.columns:
+        csv_file.drop("OutcomeSubType", axis=1, inplace = True)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    if (nominal2numeric == True):
+        if verbose > 0:
+            print_progress("Converting nominal to numeric data...")
+            start_time = time.clock()
+        to_number = LabelEncoder()
+        csv_file["AnimalType"]  = to_number.fit_transform(csv_file['AnimalType'])
+        csv_file["Sex"]         = to_number.fit_transform(csv_file['Sex'])
+        csv_file["Neutered"]    = to_number.fit_transform(csv_file['Neutered'])
+        csv_file["isMix"]       = to_number.fit_transform(csv_file['isMix'])
+        csv_file["hasName"]     = to_number.fit_transform(csv_file['hasName'])
+        if "OutcomeType" in csv_file.columns:
+            csv_file["OutcomeType"] = to_number.fit_transform(csv_file['OutcomeType'])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+
+
+    # TODO: Completar idades faltantes média dos animais de mesmo tipo de outcome
+    # Only remove lines for training. Test data must be treated with all data. 
+    if verbose > 0:
+        start_time = time.clock()
+    if verbose > 0:
+        print_progress("Filliing NAN with -1...")
+    processed_file = csv_file.fillna(-1)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+ 
+#     # Gets/Split samples for trainning/test
 #     if verbose > 0:
 #         start_time = time.clock()
-#     if (nanfill == True):
-#         if verbose > 0:
-#             print_progress("Filliing NAN with -1...")
-#         processed_file = csv_file.fillna(-1)
-#     else:
-#         if verbose > 0:
-#             print_progress("Removing NAN from data...")
-#         processed_file = csv_file.dropna()
+#     if verbose > 0:
+#         print_progress("Gets/Split samples for trainning/test")
+#     kf = KFold(10, n_folds=5, shuffle=False)
 #     if verbose > 0:
 #         print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-#     # processed_file still keep 'ID' and, maybe, 'target' attributes.
-#     # Let's remove them!
-#     id_data = processed_file["ID"].values
-#     if "target" in csv_file.columns:
-#         target_data    = processed_file["target"].values
-#         processed_file = processed_file.drop(target_att + id_att, axis=1)
-#         if (norm_data == True):
-#             if verbose > 0:
-#                 print_progress("Normalizing data...")
-#                 start_time = time.clock()
-#             processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
-#             if verbose > 0:
-#                 print("--> %8.3f seconds" % (time.clock() - start_time))
-#         return processed_file, id_data, target_data
-#     else:
-#         processed_file = processed_file.drop(id_att, axis=1)
-#         if (norm_data == True):
-#             if verbose > 0:
-#                 print_progress("Normalizing data...")
-#                 start_time = time.clock()
-#             processed_file = normalize(processed_file, norm='l2', axis=1, copy=False)
-#             if verbose > 0:
-#                 print("--> %8.3f seconds" % (time.clock() - start_time))
-        # TODO Remover as atribuicoes abaixo
-    processed_file = filename.dropna()
-    id_data = processed_file["ID"].values
-    return processed_file, id_data
+ 
+ 
+        return processed_file
         
         
 ###############################################################################
@@ -354,7 +290,7 @@ def choose_best_algorithm():
 ###############################################################################
 #                           RUN_ALGORITHM FUNCTION
 ###############################################################################
-def run_algorithm(best_alg, train_file, test_file, target_data, train_sample_size):
+def run_algorithm(best_alg, train_file, test_file, train_sample_size):
 #     global verbose
 #     perc = 0.1 # Percentage to build a training/test files
 #     
@@ -417,7 +353,7 @@ def run_algorithm(best_alg, train_file, test_file, target_data, train_sample_siz
 #         print("--> %8.3f seconds" % (time.clock() - start_time))
 # 
 # 
-    # TODO Remover as atribuicoes abaixo
+    # TODO: Remover as atribuicoes abaixo
     training_score = 0.0
     pred_prob = 0.0
     return training_score, pred_prob
@@ -439,7 +375,7 @@ def print_progress(msg):
 ###############################################################################
 #                           SHOW_RESULTS FUNCTION
 ###############################################################################
-def print_results(pred_prob, training_score, id_test, out_filename, totaltime):
+def print_results(pred_prob, training_score, out_filename, totaltime):
     global verbose
 
     print ("Training accuracy: %.2f" % (training_score * 100.0))    
@@ -502,8 +438,8 @@ def main(argv=None): # IGNORE:C0111
         new_test_file  = get_new_file(test_filename)
         
         # Pre-process the data
-        train_file, target_data = pre_process(new_train_file)
-        test_file, test_id_data = pre_process(new_test_file)
+        train_file = pre_process(new_train_file)
+        test_file  = pre_process(new_test_file)
         
         # Run cross-validation to tune parameters for the algorithms
         tunning_parameters()
@@ -515,19 +451,17 @@ def main(argv=None): # IGNORE:C0111
         train_score, pred_prob = run_algorithm(best_alg, \
                                                train_file, \
                                                test_file, \
-                                               target_data, \
                                                sample_size_tr)
         
         # Print the results and save a file with the probabilities
-        print_results(pred_prob, train_score, test_id_data, \
-                      out_filename, total_time)        
+        print_results(pred_prob, train_score, out_filename, total_time)        
         
         # Ends application
         return 0
     
     
     # Handle errors
-    except Exception, e:
+    except Exception as e:
         raise(e)
         return 2
 
