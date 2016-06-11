@@ -249,7 +249,7 @@ def pre_process(csv_file):
             print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
-    # TODO: Completar idades faltantes média dos animais de mesmo tipo de outcome
+    # TODO: Completar idades faltantes com média dos animais de mesmo tipo de outcome
     # Only remove lines for training. Test data must be treated with all data. 
     if verbose > 0:
         start_time = time.clock()
