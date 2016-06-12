@@ -138,7 +138,13 @@ def get_new_file(filename):
     # One of the files has a different column ID name. Fix it so that
     # both train and test have the same column name for ID    
     if "AnimalID" in csv_file.columns:
+        if verbose > 0:
+            print_progress("Adjusting ID column...")
+            start_time = time.clock()
         csv_file=csv_file.rename(columns = {"AnimalID":"ID"})
+        csv_file["ID"] = csv_file["ID"].apply(lambda x: x.split("A")[1])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
 
 
     # Then we convert 'AgeuponOutcome' to unit 'days'
@@ -228,16 +234,28 @@ def pre_process(csv_file):
         print_progress("Removing useless attributes...")
         start_time = time.clock()
     csv_file.drop(useless_att_droplist, axis=1, inplace = True)
-    if "OutcomeSubType" in csv_file.columns:
-        csv_file.drop("OutcomeSubType", axis=1, inplace = True)
+    if "OutcomeSubtype" in csv_file.columns:
+        csv_file.drop("OutcomeSubtype", axis=1, inplace = True)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+    # TODO: Completar idades faltantes com média dos animais de mesmo tipo de outcome
+    # Only remove lines for training. Test data must be treated with all data. 
+    if verbose > 0:
+        print_progress("Filliing NAN with -1...")
+        start_time = time.clock()
+    csv_file = csv_file.fillna(-1)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+    
 
     if (nominal2numeric == True):
         if verbose > 0:
             print_progress("Converting nominal to numeric data...")
             start_time = time.clock()
         to_number = LabelEncoder()
+        csv_file["singleColor"] = to_number.fit_transform(csv_file['singleColor'])
+        csv_file["singleBreed"] = to_number.fit_transform(csv_file['singleBreed'])
         csv_file["AnimalType"]  = to_number.fit_transform(csv_file['AnimalType'])
         csv_file["Sex"]         = to_number.fit_transform(csv_file['Sex'])
         csv_file["Neutered"]    = to_number.fit_transform(csv_file['Neutered'])
@@ -247,17 +265,6 @@ def pre_process(csv_file):
             csv_file["OutcomeType"] = to_number.fit_transform(csv_file['OutcomeType'])
         if verbose > 0:
             print("--> %8.3f seconds" % (time.clock() - start_time))
-
-
-    # TODO: Completar idades faltantes com média dos animais de mesmo tipo de outcome
-    # Only remove lines for training. Test data must be treated with all data. 
-    if verbose > 0:
-        start_time = time.clock()
-    if verbose > 0:
-        print_progress("Filliing NAN with -1...")
-    processed_file = csv_file.fillna(-1)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
  
 #     # Gets/Split samples for trainning/test
 #     if verbose > 0:
@@ -269,7 +276,7 @@ def pre_process(csv_file):
 #         print("--> %8.3f seconds" % (time.clock() - start_time))
  
  
-        return processed_file
+        return csv_file
         
         
 ###############################################################################
@@ -431,7 +438,11 @@ def main(argv=None): # IGNORE:C0111
            (train_filename == test_filename) or (train_filename == out_filename) or \
            (test_filename == out_filename):
             print("ERROR: Input and output filenames must be unique!")
-        
+            return 1
+            
+        if (norm_data == True and nominal2numeric == False):
+            print("ERROR: To normalize data nominal values must be converted into numbers with -x")
+            return 1
         
         # Handle input files as they have mixed info in the attributes
         new_train_file = get_new_file(train_filename)
