@@ -23,7 +23,7 @@ from argparse                 import RawDescriptionHelpFormatter
 from sklearn.ensemble         import RandomForestClassifier
 from sklearn.metrics          import precision_score
 from sklearn.preprocessing    import LabelEncoder, normalize
-from sklearn.cross_validation import KFold
+from sklearn.cross_validation import KFold, cross_val_score
 
 
 ###############################################################################
@@ -54,6 +54,10 @@ id_att = ["ID"]
 
 # Nominal attributes drop out list. Only common attibutes for both train/test files
 useless_att_droplist = ["DateTime"]
+
+# features to compute prob
+attr_comp = ["singleColor", "singleBreed", "AnimalType", "Sex", "Neutered",\
+             "isMix", "hasName"]
 
 
 
@@ -265,17 +269,9 @@ def pre_process(csv_file):
             csv_file["OutcomeType"] = to_number.fit_transform(csv_file['OutcomeType'])
         if verbose > 0:
             print("--> %8.3f seconds" % (time.clock() - start_time))
- 
-#     # Gets/Split samples for trainning/test
-#     if verbose > 0:
-#         start_time = time.clock()
-#     if verbose > 0:
-#         print_progress("Gets/Split samples for trainning/test")
-#     kf = KFold(10, n_folds=5, shuffle=False)
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
- 
- 
+            
+            # TODO: Vamos implementar a normalização ???
+            
         return csv_file
         
         
@@ -298,72 +294,57 @@ def choose_best_algorithm():
 #                           RUN_ALGORITHM FUNCTION
 ###############################################################################
 def run_algorithm(best_alg, train_file, test_file, train_sample_size):
-#     global verbose
-#     perc = 0.1 # Percentage to build a training/test files
-#     
-#     if verbose > 0:
-#         print_progress("Create the random forest object for fitting.")
-#         start_time = time.clock()
-#     # random_state=1000 is a magic number. See answer by cacol89 in this question: 
-#     # http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html    
-#     classif = RandomForestClassifier(n_estimators = 200, n_jobs = -1, \
-#                                      max_features=None, random_state=1000, \
-#                                      class_weight={1:0.7612, 0:0.2388})
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-# 
-#     if verbose > 0:
-#         print_progress("Creating training data for fitting...")
-#         start_time = time.clock()
-#     # We need a subset of a known data in order to fit the classifier
-#     # and calculate its score.
-#     train_fit_file  = train_file[:train_sample_size]
-#     fit_target_data = target_data[:train_sample_size]
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-#     if verbose > 0:
-#         print_progress("Performing fitting...")
-#         start_time = time.clock()
-#     fit_result = classif.fit(train_fit_file, fit_target_data)
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-#     
-#     
-#     if verbose > 0:
-#         print_progress("Performing prediction on training data...")
-#         start_time = time.clock()
-#     # As we took a percentage of data to fit the classifier, now we use 
-#     # 100% - perc for training data
-#     train_file  = train_file [int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
-#     target_data = target_data[int(len(fit_target_data)):int(len(fit_target_data))+int(len(fit_target_data) * perc)]
-#     prediction  = fit_result.predict(train_file)    
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-# 
-#     if verbose > 0:
-#         print_progress("Calculating training score...")
-#         start_time = time.clock()
-#     training_score = precision_score(target_data, prediction)
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-#     
-# 
-#     if verbose > 0:
-#         print_progress("Performing prediction on test data...")
-#         start_time = time.clock()
-#     prediction  = fit_result.predict(test_file)    
-#     pred_prob   = fit_result.predict_proba(test_file)
-#     if verbose > 0:
-#         print("--> %8.3f seconds" % (time.clock() - start_time))
-# 
-# 
-    # TODO: Remover as atribuicoes abaixo
-    training_score = 0.0
-    pred_prob = 0.0
-    return training_score, pred_prob
+    global verbose
+
+    # Gets/Split samples for trainning/test
+    if verbose > 0:
+        start_time = time.clock()
+    if verbose > 0:
+        print_progress("Gets/Split samples for trainning/test")
+    kf = KFold(len(train_file), n_folds=10, shuffle=False)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    if verbose > 0:
+        print_progress("Create the random forest object for fitting.")
+        start_time = time.clock()
+    # random_state=1000 is a magic number. See answer by cacol89 in this question: 
+    # http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html    
+    classif = RandomForestClassifier(n_estimators = 200, n_jobs = -1, \
+                                     max_features=None, random_state=1000)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    #iterate through the training and test cross validation segments and
+    #run the classifier on each one, aggregating the results into a list
+    score_result = 0.0
+    target = train_file["OutcomeType"].values
+    train_data = train_file[attr_comp].values
+    for traincv, testcv in kf:
+        if verbose > 0:
+            print_progress("Performing fitting...")
+            start_time = time.clock()
+        fit_result = classif.fit(train_data[traincv], target[traincv])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+        if verbose > 0:
+            print_progress("Calculating training score...")
+            start_time = time.clock()
+        score = fit_result.score(train_data[testcv], target[testcv])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+
+        if score_result < score:
+            score_result = score
+            if verbose > 0:
+                print_progress("Performing prediction on test data...")
+                start_time = time.clock()
+            pred_prob = fit_result.predict_proba(test_file[attr_comp].values)
+            if verbose > 0:
+                print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    return score_result, test_file["ID"].values, pred_prob
 
 
 ###############################################################################
@@ -382,7 +363,7 @@ def print_progress(msg):
 ###############################################################################
 #                           SHOW_RESULTS FUNCTION
 ###############################################################################
-def print_results(pred_prob, training_score, out_filename, totaltime):
+def print_results(id_test, pred_prob, training_score, out_filename, totaltime):
     global verbose
 
     print ("Training accuracy: %.2f" % (training_score * 100.0))    
@@ -390,8 +371,15 @@ def print_results(pred_prob, training_score, out_filename, totaltime):
     if verbose > 0:
         start_time = time.clock()
         print_progress("Writing output file...")
-#     datafile.DataFrame({"ID": id_test, "PredictedProb": pred_prob[:,1]}).\
-#                         to_csv(out_filename, index=False)
+    datafile.DataFrame({"ID"             : id_test, \
+                        "Adoption"       : pred_prob[:,0], \
+                        "Died"           : pred_prob[:,1], \
+                        "Euthanasia"     : pred_prob[:,2], \
+                        "Return_to_owner": pred_prob[:,3], \
+                        "Transfer"       : pred_prob[:,4]  \
+                        }, columns=["ID","Adoption","Died","Euthanasia",\
+                                    "Return_to_owner","Transfer"]
+                       ).to_csv(out_filename, index=False)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
         print("Total execution time: %8.3f seconds" % (time.clock() - totaltime))
@@ -459,13 +447,13 @@ def main(argv=None): # IGNORE:C0111
         best_alg = choose_best_algorithm()
         
         # Run the chosen algorithm
-        train_score, pred_prob = run_algorithm(best_alg, \
-                                               train_file, \
-                                               test_file, \
-                                               sample_size_tr)
+        train_score, id_test, pred_prob = run_algorithm(best_alg, \
+                                                        train_file, \
+                                                        test_file, \
+                                                        sample_size_tr)
         
         # Print the results and save a file with the probabilities
-        print_results(pred_prob, train_score, out_filename, total_time)        
+        print_results(id_test, pred_prob, train_score, out_filename, total_time)        
         
         # Ends application
         return 0
