@@ -57,8 +57,7 @@ useless_att_droplist = ["DateTime"]
 
 # features to compute prob
 attr_comp = ["singleColor", "singleBreed", "AnimalType", "Sex", "Neutered",\
-             "isMix", "hasName"]
-
+             "isMix", "hasName", "nbrofColors", "DaysUponOutcome"]
 
 
 ###############################################################################
