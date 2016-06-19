@@ -14,6 +14,7 @@ import sys
 import os
 import time
 import pandas as datafile
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import style
 style.use("ggplot")
@@ -35,7 +36,6 @@ verbose = 0
 nanfill = False
 nominal2numeric = False
 norm_data = False
-remove_corr = False
 run_alg = False
 tunning_par = False
 choose_alg = False
@@ -121,6 +121,12 @@ def get_time_info(date_time):
     date_time = str(date_time)
     return date_time.split(" ")[1]
        
+def get_nan(x):
+    if x=='Unknown':
+        return np.NaN
+    else:
+        return x
+        
         
 ###############################################################################
 #                    BUILD A NEW TRAIN/TEST FILE FUNCTION
@@ -128,7 +134,7 @@ def get_time_info(date_time):
 # Then split some data as the original datafile has mixed info in it.
 ###############################################################################
 def get_new_file(filename):
-    global verbose
+    global verbose, nanfill
     
     # First of all we need open/read the datafile
     if verbose > 0:
@@ -149,6 +155,28 @@ def get_new_file(filename):
         if verbose > 0:
             print("--> %8.3f seconds" % (time.clock() - start_time))
 
+    # Handling missing values
+    if (nanfill == True):
+        if verbose > 0:
+            print_progress("Filliing NAN with -1...")
+            start_time = time.clock()
+        csv_file = csv_file.fillna(-1)
+    else:    
+        if verbose > 0:
+            print_progress("Filliing NAN with most frequent value...")
+            start_time = time.clock()
+        # We convert the csv_file in boolean values. Then we discover which 
+        # columns have or not NaN values and iterate over csv_filem to fill 
+        # with most frequent value.    
+        data_with_nan = csv_file.isnull().any()
+        data_with_nan = data_with_nan.drop(["ID", "Name", "DateTime"])
+        csv_file_aux = csv_file.dropna()
+        for column_with_nan in data_with_nan.index:
+            if (data_with_nan[column_with_nan] == True):
+                mean_value = csv_file_aux[column_with_nan].value_counts().index[0]
+                csv_file[column_with_nan] = csv_file[column_with_nan].fillna(mean_value)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
 
     # Then we convert 'AgeuponOutcome' to unit 'days'
     if verbose > 0:
@@ -230,7 +258,7 @@ def get_new_file(filename):
 #                           PRE_PROCESS FUNCTION
 ###############################################################################
 def pre_process(csv_file):
-    global verbose, nanfill, nominal2numeric, norm_data, remove_corr
+    global verbose, nanfill, nominal2numeric, norm_data
  
  
     if verbose > 0:
@@ -241,16 +269,7 @@ def pre_process(csv_file):
         csv_file.drop("OutcomeSubtype", axis=1, inplace = True)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
-        
-    # TODO: Completar idades faltantes com média dos animais de mesmo tipo de outcome
-    # Only remove lines for training. Test data must be treated with all data. 
-    if verbose > 0:
-        print_progress("Filliing NAN with -1...")
-        start_time = time.clock()
-    csv_file = csv_file.fillna(-1)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
-    
+            
 
     if (nominal2numeric == True):
         if verbose > 0:
@@ -292,7 +311,7 @@ def choose_best_algorithm():
 ###############################################################################
 #                           RUN_ALGORITHM FUNCTION
 ###############################################################################
-def run_algorithm(best_alg, train_file, test_file, train_sample_size):
+def run_algorithm(best_alg, train_file, test_file):
     global verbose
 
     # Gets/Split samples for trainning/test
@@ -391,7 +410,7 @@ def print_results(id_test, pred_prob, training_score, out_filename, totaltime):
 #                               MAIN FUNCTION
 ###############################################################################
 def main(argv=None): # IGNORE:C0111
-    global verbose, nanfill, nominal2numeric, norm_data, remove_corr, run_alg, \
+    global verbose, nanfill, nominal2numeric, norm_data, run_alg, \
            choose_alg, tunning_par
 
     total_time = time.clock()
@@ -399,10 +418,8 @@ def main(argv=None): # IGNORE:C0111
     try:
         # Parser for command line arguments
         parser = ArgumentParser()
-        parser.add_argument("-c", dest="remove_cor", default=False, action="store_true", help="remove attributes with correlation >= 95% between each other")
-        parser.add_argument("-m", dest="norm_data" , default=False, action="store_true", help="norm numeric data")
-        parser.add_argument("-n", dest="nanfill"   , default=False, action="store_true", help="fills nan values with -1")
-        parser.add_argument("-s", dest="size_tr"   , default=1000 ,                      help="sample size for training")
+        parser.add_argument("-m", dest="norm_data" , default=False, action="store_true", help="normalize numeric data")
+        parser.add_argument("-n", dest="nanfill"   , default=False, action="store_true", help="fills NaN values with -1 instead most frequent value")
         parser.add_argument("-v", dest="verbose"   , default=0    , action="count",      help="shows script execution steps")
         parser.add_argument("-x", dest="nom2num"   , default=False, action="store_true", help="convert nominal attributes to numerical")
 
@@ -415,8 +432,6 @@ def main(argv=None): # IGNORE:C0111
         nanfill        = args.nanfill 
         nominal2numeric= args.nom2num
         norm_data      = args.norm_data
-        remove_corr    = args.remove_cor
-        sample_size_tr = int(args.size_tr)
 
         if verbose > 0:
             print("Verbose mode: ON")
@@ -448,8 +463,7 @@ def main(argv=None): # IGNORE:C0111
         # Run the chosen algorithm
         train_score, id_test, pred_prob = run_algorithm(best_alg, \
                                                         train_file, \
-                                                        test_file, \
-                                                        sample_size_tr)
+                                                        test_file)
         
         # Print the results and save a file with the probabilities
         print_results(id_test, pred_prob, train_score, out_filename, total_time)        
