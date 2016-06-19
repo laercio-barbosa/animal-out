@@ -121,12 +121,6 @@ def get_time_info(date_time):
     date_time = str(date_time)
     return date_time.split(" ")[1]
        
-def get_nan(x):
-    if x=='Unknown':
-        return np.NaN
-    else:
-        return x
-        
         
 ###############################################################################
 #                    BUILD A NEW TRAIN/TEST FILE FUNCTION
