@@ -22,6 +22,7 @@ style.use("ggplot")
 from argparse                 import ArgumentParser
 from argparse                 import RawDescriptionHelpFormatter
 from sklearn.ensemble         import RandomForestClassifier
+from sklearn.tree             import DecisionTreeClassifier 
 from sklearn.metrics          import precision_score
 from sklearn.preprocessing    import LabelEncoder, normalize
 from sklearn.cross_validation import KFold, cross_val_score
@@ -303,10 +304,13 @@ def choose_best_algorithm():
     return alg_chosen
 
 ###############################################################################
-#                           RUN_ALGORITHM FUNCTION
+#                         RUN_RANDOM_FOREST FUNCTION
 ###############################################################################
-def run_algorithm(best_alg, train_file, test_file):
+def run_random_forest(train_file, test_file):
     global verbose
+
+    target = train_file["OutcomeType"].values
+    train_data = train_file[attr_comp].values
 
     # Gets/Split samples for trainning/test
     if verbose > 0:
@@ -317,21 +321,80 @@ def run_algorithm(best_alg, train_file, test_file):
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
-    if verbose > 0:
-        print_progress("Create the random forest object for fitting.")
-        start_time = time.clock()
-    # random_state=1000 is a magic number. See answer by cacol89 in this question: 
-    # http://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html    
-    classif = RandomForestClassifier(n_estimators = 200, n_jobs = -1, \
-                                     max_features=None, random_state=1000)
-    if verbose > 0:
-        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    # Run cross-validation to tune parameters
+    print ("Tunning Random Forest classifier...")
+    score_result = 0.0
+    for nbr_estimators in range(100, 400, 100):  
+        if nbr_estimators == 0: 
+            nbr_estimators = 1  
+        classif = RandomForestClassifier(n_estimators = nbr_estimators, n_jobs = -1, \
+                                         max_features="sqrt", random_state=1000)
+        scores = cross_val_score(classif,train_data, target, scoring='accuracy',\
+                                 cv=10, n_jobs=-1)
+        if score_result < scores.mean():
+            score_result = scores.mean()
+            best_classif = classif
+            best_estimator = nbr_estimators
+        print ("Tunning:  n_estimator = %d / acurácia = %6.2f" %(nbr_estimators, scores.mean()*100))
+    print ("Best n_estimator = %d / acurácia = %6.2f" %(best_estimator, score_result*100))
+
 
     #iterate through the training and test cross validation segments and
     #run the classifier on each one, aggregating the results into a list
     score_result = 0.0
+    for traincv, testcv in kf:
+        if verbose > 0:
+            print_progress("Performing fitting...")
+            start_time = time.clock()
+        fit_result = best_classif.fit(train_data[traincv], target[traincv])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+        
+        if verbose > 0:
+            print_progress("Calculating training score...")
+            start_time = time.clock()
+        score = fit_result.score(train_data[testcv], target[testcv])
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+
+        if score_result < score:
+            score_result = score
+            if verbose > 0:
+                print_progress("Performing prediction on test data...")
+                start_time = time.clock()
+            pred_prob = fit_result.predict_proba(test_file[attr_comp].values)
+            if verbose > 0:
+                print("--> %8.3f seconds" % (time.clock() - start_time))
+
+    return score_result, test_file["ID"].values, pred_prob
+
+
+###############################################################################
+#                         RUN_DECISION_TREES FUNCTION
+###############################################################################
+def run_decision_trees(train_file, test_file):
+    global verbose
+
     target = train_file["OutcomeType"].values
     train_data = train_file[attr_comp].values
+
+    # Gets/Split samples for trainning/test
+    if verbose > 0:
+        start_time = time.clock()
+    if verbose > 0:
+        print_progress("Gets/Split samples for trainning/test")
+    kf = KFold(len(train_file), n_folds=10, shuffle=False)
+    if verbose > 0:
+        print("--> %8.3f seconds" % (time.clock() - start_time))
+
+
+    # Create the classifier
+    classif = DecisionTreeClassifier(max_features="sqrt", random_state=1000)
+
+    #iterate through the training and test cross validation segments and
+    #run the classifier on each one, aggregating the results into a list
+    score_result = 0.0
     for traincv, testcv in kf:
         if verbose > 0:
             print_progress("Performing fitting...")
@@ -375,14 +438,16 @@ def print_progress(msg):
 ###############################################################################
 #                           SHOW_RESULTS FUNCTION
 ###############################################################################
-def print_results(id_test, pred_prob, training_score, out_filename, totaltime):
+def print_results(classifier_text, id_test, pred_prob, training_score, out_filename):
     global verbose
 
-    print ("Training accuracy: %.2f" % (training_score * 100.0))    
+    print
+    print
+    print (classifier_text + " training accuracy: %.2f" % (training_score * 100.0))    
 
     if verbose > 0:
         start_time = time.clock()
-        print_progress("Writing output file...")
+        print_progress("Writing " + classifier_text + " output file...")
     datafile.DataFrame({"ID"             : id_test, \
                         "Adoption"       : pred_prob[:,0], \
                         "Died"           : pred_prob[:,1], \
@@ -394,7 +459,6 @@ def print_results(id_test, pred_prob, training_score, out_filename, totaltime):
                        ).to_csv(out_filename, index=False)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
-        print("Total execution time: %8.3f seconds" % (time.clock() - totaltime))
     if verbose > 0:
         print("Done!")
 
@@ -448,19 +512,20 @@ def main(argv=None): # IGNORE:C0111
         train_file = pre_process(new_train_file)
         test_file  = pre_process(new_test_file)
         
-        # Run cross-validation to tune parameters for the algorithms
-        tunning_parameters()
         
-        # Run cross-validation to choose the best algorithm for this problem
-        best_alg = choose_best_algorithm()
+        # Run classifiers algorithms
+        rf_train_score, rf_id_test, rf_pred_prob = run_random_forest(train_file, test_file)
+        dt_train_score, dt_id_test, dt_pred_prob = run_decision_trees(train_file, test_file)
         
-        # Run the chosen algorithm
-        train_score, id_test, pred_prob = run_algorithm(best_alg, \
-                                                        train_file, \
-                                                        test_file)
         
-        # Print the results and save a file with the probabilities
-        print_results(id_test, pred_prob, train_score, out_filename, total_time)        
+        # Print results and save output file
+        print_results("RandomForest",  rf_id_test, rf_pred_prob, rf_train_score, "../out/rf_result.csv")        
+        print_results("DecisionTrees", dt_id_test, dt_pred_prob, dt_train_score, "../out/dt_result.csv")        
+
+        if verbose > 0:
+            print
+            print("Total execution time: %8.3f seconds" % (time.clock() - total_time))
+
         
         # Ends application
         return 0
