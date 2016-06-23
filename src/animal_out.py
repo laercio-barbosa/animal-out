@@ -10,10 +10,6 @@ src.animal_out -- Machine Learning Algorithm
 @deffield    updated: Updated
 '''
 
-# FIXME: Temporary fix for a warning that spams the screem
-import warnings
-warnings.filterwarnings("ignore")
-
 import sys
 import os
 import time
@@ -44,7 +40,7 @@ norm_data = False
 run_alg = False
 tunning_par = False
 choose_alg = False
-kfold_value = 30
+kfold_value = 10
 
 
 # Target attribute
