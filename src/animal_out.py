@@ -269,7 +269,7 @@ def cross_validation(new_train_file,target):
     train_target = ""
     test_file = ""    
     
-    for i in range(nGroups):
+    for i in range(1):
         begin = i * nSamples
         end = begin + nSamples
         
@@ -280,15 +280,26 @@ def cross_validation(new_train_file,target):
         train_target = temp_train_target.drop(temp_train_target.index[begin:end])
         
         test_file = new_train_file[begin:end]
-        print(str(begin)+" "+str(end)) 
+        #print(str(begin)+" "+str(end)) 
         
         temp_train_target = target
         temp_train_target = temp_train_target[begin:end]
         np.savetxt("Target_test"+str(i)+".txt", temp_train_target, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
 
         #print(train_file)
-        #supportVectorMachine(train_file,train_target,test_file,target,i)
+        result = supportVectorMachine(train_file,train_target,test_file,target,i)
+        #print(temp_train_target)
+        #print(result)
+        cont = 0
+        results = []
+        for j in range(len(result)):
+            if(result[j] == temp_train_target[j]):
+                cont = cont + 1
+        results.append(cont/len(result))
+        print(results)
     
+    np.savetxt("Acuracia.txt", results, fmt='%f', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+
     return "OK"
 
 def supportVectorMachine(train_file,train_target,test_file,target,index):
