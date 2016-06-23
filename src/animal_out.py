@@ -223,16 +223,19 @@ def main(argv=None):
     
     actual_directory = os.path.dirname(os.path.abspath(__file__))
     
-    train_file = actual_directory+'\\data\\train.csv';
-            
-    records = datafile.read_csv(train_file)
+    train_file = '../data/train.csv';
     
     #print (records['OutcomeType'])
     
     new_train_file = get_new_file(train_file)
     new_train_file = pre_process_shelter(new_train_file)
     
- 
+    lower = min(new_train_file['DaysUponOutcome'])
+    higher = max(new_train_file['DaysUponOutcome'])
+    normalized_file = (new_train_file['DaysUponOutcome'] - lower) / (higher-lower)    
+    new_train_file['DaysUponOutcome'] = normalized_file    
+    
+    #print(new_train_file['DaysUponOutcome'])
     
     new_train_file.drop("ID", axis=1, inplace = True)
     new_train_file.drop("OutcomeSubtype", axis=1, inplace = True)
@@ -244,26 +247,64 @@ def main(argv=None):
     target = new_train_file["OutcomeType"]
     new_train_file.drop("OutcomeType", axis=1, inplace = True)
     
-    train_file = new_train_file[:21000]
-    train_target = target[:21000]
+    #train_file = new_train_file[:21000]
+    #train_target = target[:21000]
     
-    test_file = new_train_file[-5729:]    
+    #test_file = new_train_file[-5729:]    
     
+    #print(new_train_file)
+    #np.savetxt("nova_tabela.txt", new_train_file, fmt='%s', delimiter=';', newline='\n', header='', footer='', comments='# ')
+ 
+    
+    cross_validation(new_train_file,target)
+    #supportVectorMachine(train_file,train_target,test_file,target,0)
+
+    print ("FIM")
+    return 1
+
+def cross_validation(new_train_file,target):
+    nGroups = 5    
+    nSamples = int(len(new_train_file)/nGroups)
+    train_file = ""
+    train_target = ""
+    test_file = ""    
+    
+    for i in range(nGroups):
+        begin = i * nSamples
+        end = begin + nSamples
+        
+        temp_train_file = new_train_file
+        train_file = temp_train_file.drop(temp_train_file.index[begin:end])
+        
+        temp_train_target = target
+        train_target = temp_train_target.drop(temp_train_target.index[begin:end])
+        
+        test_file = new_train_file[begin:end]
+        print(str(begin)+" "+str(end)) 
+        
+        temp_train_target = target
+        temp_train_target = temp_train_target[begin:end]
+        np.savetxt("Target_test"+str(i)+".txt", temp_train_target, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+
+        #print(train_file)
+        #supportVectorMachine(train_file,train_target,test_file,target,i)
+    
+    return "OK"
+
+def supportVectorMachine(train_file,train_target,test_file,target,index):
     clf = SVC(probability=True)
     clf.fit(np.array(train_file), np.array(train_target)) 
     
-    result = clf.predict_proba(test_file)
-    #result = clf.predict(test_file)
+    #result = clf.predict_proba(test_file)
+    result = clf.predict(test_file)
     
-    print(target[-6729:])
-    print(result)
-
-    np.savetxt("Result.txt", result, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
-    np.savetxt("Target.txt", target, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
-
-    print ("FIM")
-    return 0
+    #print(target[-6729:])
+    #print(result)
+    #np.savetxt("Test"+str(index)+".txt", result, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+    #np.savetxt("Result"+str(index)+".txt", result, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
+    #np.savetxt("Target.txt", target, fmt='%d', delimiter=' ', newline='\n', header='', footer='', comments='# ')
     
+    return result
     
 # Application start up
 if __name__ == "__main__":
