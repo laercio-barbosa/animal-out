@@ -10,6 +10,10 @@ src.animal_out -- Machine Learning Algorithm
 @deffield    updated: Updated
 '''
 
+# FIXME: Temporary fix for a warning that spams the screem
+import warnings
+warnings.filterwarnings("ignore")
+
 import sys
 import os
 import time
@@ -24,7 +28,7 @@ from argparse                 import RawDescriptionHelpFormatter
 from sklearn.ensemble         import RandomForestClassifier
 from sklearn.tree             import DecisionTreeClassifier 
 from sklearn.metrics          import precision_score
-from sklearn.preprocessing    import LabelEncoder, normalize
+from sklearn.preprocessing    import LabelEncoder, normalize, MinMaxScaler
 from sklearn.cross_validation import KFold, cross_val_score
 
 
@@ -40,12 +44,8 @@ norm_data = False
 run_alg = False
 tunning_par = False
 choose_alg = False
+kfold_value = 30
 
-class rf_param_t:
-    n_estimators = 200
-
-class nb_param_t:
-    n_estimators = 200
 
 # Target attribute
 target_att = ["OutcomeType"]
@@ -106,22 +106,6 @@ def get_neutered(x):
     if x.find('Intact')   >= 0: return 'intact'
     return 'unknown'
         
-        
-###############################################################################
-#                       GET DATE FUNCTION
-###############################################################################
-def get_date_info(date_time):
-    date_time = str(date_time)
-    return date_time.split(" ")[0]
-        
-       
-###############################################################################
-#                       GET TIME FUNCTION
-###############################################################################
-def get_time_info(date_time):
-    date_time = str(date_time)
-    return date_time.split(" ")[1]
-       
         
 ###############################################################################
 #                    BUILD A NEW TRAIN/TEST FILE FUNCTION
@@ -282,62 +266,59 @@ def pre_process(csv_file):
             csv_file["OutcomeType"] = to_number.fit_transform(csv_file['OutcomeType'])
         if verbose > 0:
             print("--> %8.3f seconds" % (time.clock() - start_time))
-            
-            # TODO: Vamos implementar a normalização ???
-            
+               
         return csv_file
         
         
 ###############################################################################
-#                           RUN_ALGORITHM FUNCTION
-###############################################################################
-def tunning_parameters():
-    parameter = 0
-
-
-###############################################################################
-#                       CHOOSE THE BEST ALGORITHM FUNCTION
-###############################################################################
-def choose_best_algorithm():
-    alg_chosen = ''
-
-    return alg_chosen
-
-###############################################################################
 #                         RUN_RANDOM_FOREST FUNCTION
 ###############################################################################
 def run_random_forest(train_file, test_file):
-    global verbose
+    global verbose, norm_data, kfold_value
 
     target = train_file["OutcomeType"].values
     train_data = train_file[attr_comp].values
 
     # Gets/Split samples for trainning/test
     if verbose > 0:
-        start_time = time.clock()
-    if verbose > 0:
         print_progress("Gets/Split samples for trainning/test")
-    kf = KFold(len(train_file), n_folds=10, shuffle=False)
+        start_time = time.clock()
+    kf = KFold(len(train_file), n_folds=kfold_value, shuffle=False)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
+    if (norm_data == True):
+        if verbose > 0:
+            print_progress("Normalizing data...")
+            start_time = time.clock()
+        min_max_scaler = MinMaxScaler()
+        train_data = min_max_scaler.fit_transform(train_data)
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
 
     # Run cross-validation to tune parameters
     print ("Tunning Random Forest classifier...")
     score_result = 0.0
-    for nbr_estimators in range(100, 400, 100):  
+    for nbr_estimators in range(300, 301, 100): 
         if nbr_estimators == 0: 
             nbr_estimators = 1  
+        if verbose > 0:
+            print_progress("Tunning estimator: %d" %nbr_estimators)
+            start_time = time.clock()
         classif = RandomForestClassifier(n_estimators = nbr_estimators, n_jobs = -1, \
                                          max_features="sqrt", random_state=1000)
         scores = cross_val_score(classif,train_data, target, scoring='accuracy',\
-                                 cv=10, n_jobs=-1)
+                                 cv=kfold_value, n_jobs=-1)
         if score_result < scores.mean():
             score_result = scores.mean()
             best_classif = classif
             best_estimator = nbr_estimators
-        print ("Tunning:  n_estimator = %d / acurácia = %6.2f" %(nbr_estimators, scores.mean()*100))
-    print ("Best n_estimator = %d / acurácia = %6.2f" %(best_estimator, score_result*100))
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
+            print ("Tunning:  n_estimator = %d / acurácia = %6.2f" %(nbr_estimators, scores.mean()*100))
+            print
+    if verbose > 0:
+        print ("Best n_estimator = %d / acurácia = %6.2f" %(best_estimator, score_result*100))
 
 
     #iterate through the training and test cross validation segments and
@@ -374,20 +355,27 @@ def run_random_forest(train_file, test_file):
 #                         RUN_DECISION_TREES FUNCTION
 ###############################################################################
 def run_decision_trees(train_file, test_file):
-    global verbose
+    global verbose, norm_data, kfold_value
 
     target = train_file["OutcomeType"].values
     train_data = train_file[attr_comp].values
 
     # Gets/Split samples for trainning/test
     if verbose > 0:
-        start_time = time.clock()
-    if verbose > 0:
         print_progress("Gets/Split samples for trainning/test")
-    kf = KFold(len(train_file), n_folds=10, shuffle=False)
+        start_time = time.clock()
+    kf = KFold(len(train_file), n_folds=kfold_value, shuffle=False)
     if verbose > 0:
         print("--> %8.3f seconds" % (time.clock() - start_time))
 
+    if (norm_data == True):
+        if verbose > 0:
+            print_progress("Normalizing data...")
+            start_time = time.clock()
+        min_max_scaler = MinMaxScaler()
+        train_data = min_max_scaler.fit_transform(train_data)
+        if verbose > 0:
+            print("--> %8.3f seconds" % (time.clock() - start_time))
 
     # Create the classifier
     classif = DecisionTreeClassifier(max_features="sqrt", random_state=1000)
@@ -514,8 +502,21 @@ def main(argv=None): # IGNORE:C0111
         
         
         # Run classifiers algorithms
+        if verbose > 0:
+            print("Starting Random Forest classifier...")
+            start_time = time.clock()
         rf_train_score, rf_id_test, rf_pred_prob = run_random_forest(train_file, test_file)
+        if verbose > 0:
+            print("Random Forest classifier --> %8.3f seconds. Done!" % (time.clock() - start_time))
+            print
+
+        if verbose > 0:
+            print("Starting Decision Trees classifier...")
+            start_time = time.clock()
         dt_train_score, dt_id_test, dt_pred_prob = run_decision_trees(train_file, test_file)
+        if verbose > 0:
+            print("Decision Trees classifier --> %8.3f seconds. Done!" % (time.clock() - start_time))
+            print
         
         
         # Print results and save output file
